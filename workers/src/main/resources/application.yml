@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: billing-workers
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/billing
+    username: billing
+    password: billing
+  jpa:
+    hibernate:
+      # workers never owns the schema — api's Flyway migrations are the only
+      # source of truth. "validate" catches drift instead of silently allowing it.
+      ddl-auto: validate
+    open-in-view: false
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+server:
+  port: 8081
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
