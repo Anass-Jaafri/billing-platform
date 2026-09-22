@@ -2,7 +2,9 @@ package com.anass.billing.api;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
 /**
  * Entry point for the REST API service.
@@ -13,7 +15,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
  * module is the event <em>consumer</em> — see TDD_and_ADRs.md Section 2 for
  * the full architecture diagram.
  */
-@EnableJpaAuditing
+
 @SpringBootApplication(scanBasePackages = "com.anass.billing")
 public class ApiApplication {
 
