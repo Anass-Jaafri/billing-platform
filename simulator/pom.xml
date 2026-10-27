@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.anass.billing</groupId>
+        <artifactId>billing-platform</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>simulator</artifactId>
+    <packaging>jar</packaging>
+
+    <name>simulator</name>
+    <description>
+        Stand-in for the payment provider: a command-line tool that calls the
+        real webhook endpoint over HTTP. Deliberately has no dependency
+        on common/api — like a real provider, it only knows a URL and a JSON shape.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.7</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Lets us run the tool with "mvn exec:java" without repeating the class name -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>com.anass.billing.simulator.SimulatorMain</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
