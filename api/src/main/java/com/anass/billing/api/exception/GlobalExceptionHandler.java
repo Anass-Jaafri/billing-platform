@@ -71,4 +71,11 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity.internalServerError().body(body);
     }
+
+    @ExceptionHandler(DuplicateWebhookException.class)
+    public ResponseEntity<Void> handleDuplicateWebhook(DuplicateWebhookException ex){
+        // Not an error from the provider's point of view: 200 means "got it,
+        // stop retrying". Handled here once, instead of in every caller.
+        return ResponseEntity.ok().build();
+    }
 }
