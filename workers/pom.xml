@@ -15,11 +15,10 @@
 
     <name>workers</name>
     <description>
-        RabbitMQ consumers: invoice, email, and audit workers (WRK-*), plus
-        Resilience4j retry/DLQ handling (RES-*). Deliberately a separate
+        RabbitMQ consumers: invoice, email, and audit workers, plus
+        Resilience4j retry/DLQ handling. Deliberately a separate
         deployable from api so one worker's failure — or the whole workers
-        process going down — cannot take down the REST API. See TDD_and_ADRs.md
-        ADR-001 and ADR-003.
+        process going down — cannot take down the REST API.
     </description>
 
     <dependencies>
@@ -42,12 +41,17 @@
         </dependency>
 
         <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-json</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Resilience4j (RES-1, RES-2) -->
+        <!-- Resilience4j -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>
             <artifactId>resilience4j-spring-boot3</artifactId>
