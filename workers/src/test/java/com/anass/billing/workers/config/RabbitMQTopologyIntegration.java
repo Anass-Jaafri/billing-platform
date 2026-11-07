@@ -30,26 +30,28 @@ public class RabbitMQTopologyIntegration {
     // The workers app still needs a database to start, even though this test never uses it
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
+    @Autowired
+    private AmqpAdmin amqpAdmin;
 
     @DynamicPropertySource
-    static void connectToContainers(DynamicPropertyRegistry registry){
+    static void connectToContainers(DynamicPropertyRegistry registry) {
+        registry.add("spring.rabbitmq.listener.simple.auto-startup", () -> "false");
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.rabbitmq.host", rabbit::getHost);
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
     }
-    @Autowired
-    private RabbitTemplate rabbitTemplate;
-    @Autowired private AmqpAdmin amqpAdmin;
 
     @Test
-    void oneEvent_isCopiedIntoEveryWorkerQueue(){
-        rabbitTemplate.convertAndSend(Messaging.CHARGE_EVENTS_EXCHANGE,"","one event");
+    void oneEvent_isCopiedIntoEveryWorkerQueue() {
+        rabbitTemplate.convertAndSend(Messaging.CHARGE_EVENTS_EXCHANGE, "", "one event");
 
-        for (String queue : List.of(Messaging.INVOICE_QUEUE, Messaging.EMAIL_QUEUE, Messaging.AUDIT_QUEUE)){
+        for (String queue : List.of(Messaging.INVOICE_QUEUE, Messaging.EMAIL_QUEUE, Messaging.AUDIT_QUEUE)) {
             await().atMost(Duration.ofSeconds(5))
-                    .untilAsserted(()->
+                    .untilAsserted(() ->
                             assertThat(amqpAdmin.getQueueInfo(queue).getMessageCount()).isEqualTo(1));
         }
     }

@@ -6,8 +6,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 /**
  * Entry point for the RabbitMQ consumer service.
  *
- * <p>Runs the invoice, email, and audit workers (WRK-*) as a deliberately
- * separate deployable from the api module — see TDD_and_ADRs.md ADR-001.
+ * <p>Runs the invoice, email, and audit workers as a deliberately
+ * separate deployable from the api module
  * This module never runs Flyway migrations itself; the api module owns the
  * schema, workers only reads/writes through it.
  */
