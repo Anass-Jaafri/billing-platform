@@ -8,7 +8,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,7 +24,7 @@ public class ReceiptServiceTest {
     @Test
     void sendReceiptFor_buildsReceiptFromEvent() {
         UUID chargeId = UUID.randomUUID();
-        ChargeEvent event = new ChargeEvent("charge.confirmed", UUID.randomUUID(), LocalDateTime.now(),
+        ChargeEvent event = new ChargeEvent("charge.confirmed", UUID.randomUUID(), Instant.now(),
                 new ChargeEvent.ChargeEventData(chargeId, 5000, "MAD", "cust_123"));
 
         receiptService.sendReceiptFor(event);

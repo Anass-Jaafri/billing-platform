@@ -7,7 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
@@ -21,7 +21,7 @@ public class EmailListenerTest {
     EmailListener listener;
 
     private ChargeEvent event(String type) {
-        return new ChargeEvent(type, UUID.randomUUID(), LocalDateTime.now(),
+        return new ChargeEvent(type, UUID.randomUUID(), Instant.now(),
                 new ChargeEvent.ChargeEventData(UUID.randomUUID(), 5000, "MAD", "cust_123"));
     }
 

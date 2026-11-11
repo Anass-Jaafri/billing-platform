@@ -7,7 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 @RestControllerAdvice
@@ -18,14 +18,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidation(
             MethodArgumentNotValidException ex,
             HttpServletRequest request
-    ){
+    ) {
         List<ErrorResponse.FieldErrorDetail> fieldErrors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(fe-> new ErrorResponse.FieldErrorDetail(fe.getField(),fe.getDefaultMessage()))
+                .map(fe -> new ErrorResponse.FieldErrorDetail(fe.getField(), fe.getDefaultMessage()))
                 .toList();
         ErrorResponse body = new ErrorResponse(
-                LocalDateTime.now(),
+                Instant.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Validation Failed",
                 "One or more fields are invalid",
@@ -39,17 +39,18 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ChargeNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleChargeNotFound(
             ChargeNotFoundException ex, HttpServletRequest request
-    ){
+    ) {
         ErrorResponse body = new ErrorResponse(
-                LocalDateTime.now(),
+                Instant.now(),
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",
                 ex.getMessage(),
                 request.getRequestURI(),
                 null
         );
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
+
     // Catch-all safety net — anything unexpected becomes a safe 500,
     // never leaking the real exception message or stack trace to the client
     @ExceptionHandler(Exception.class)
@@ -61,7 +62,7 @@ public class GlobalExceptionHandler {
                 .error("Unhandled exception on {}", request.getRequestURI(), ex);
 
         ErrorResponse body = new ErrorResponse(
-                LocalDateTime.now(),
+                Instant.now(),
                 HttpStatus.INTERNAL_SERVER_ERROR.value(),
                 "Internal Server Error",
                 "An unexpected error occurred",
@@ -73,7 +74,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(DuplicateWebhookException.class)
-    public ResponseEntity<Void> handleDuplicateWebhook(DuplicateWebhookException ex){
+    public ResponseEntity<Void> handleDuplicateWebhook(DuplicateWebhookException ex) {
         // Not an error from the provider's point of view: 200 means "got it,
         // stop retrying". Handled here once, instead of in every caller.
         return ResponseEntity.ok().build();
