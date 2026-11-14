@@ -13,7 +13,7 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -34,5 +34,5 @@ public class WebhookEvent extends BaseEntity {
     @Column(nullable = false, columnDefinition = "jsonb")
     private String payload;
 
-    private LocalDateTime processedAt; // null until successfully processed
+    private Instant processedAt; // null until successfully processed
 }

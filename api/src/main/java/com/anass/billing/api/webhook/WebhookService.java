@@ -10,9 +10,6 @@ import com.anass.billing.common.webhook.WebhookEvent;
 import com.anass.billing.common.webhook.WebhookEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.time.LocalDateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -22,6 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+
+import java.sql.SQLException;
+import java.time.Duration;
+import java.time.Instant;
 
 @Service
 public class WebhookService {
@@ -84,7 +85,7 @@ public class WebhookService {
         chargeRepository.save(charge);
 
         // 5. Mark the receipt as fully handled.
-        webhookEvent.setProcessedAt(LocalDateTime.now());
+        webhookEvent.setProcessedAt(Instant.now());
         webhookEventRepository.save(webhookEvent);
 
         // 6. Queue the announcement. Held until the bundle commits.

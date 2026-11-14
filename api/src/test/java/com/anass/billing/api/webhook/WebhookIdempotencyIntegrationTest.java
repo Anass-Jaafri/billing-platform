@@ -26,7 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.sql.Timestamp;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +49,6 @@ import static org.mockito.Mockito.reset;
 public class WebhookIdempotencyIntegrationTest {
 
 
-    private static final String TEST_QUEUE = "wh-7-test-queue";
     // static = started once for the whole class, shared by every test
     @Container
     static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
@@ -58,10 +57,29 @@ public class WebhookIdempotencyIntegrationTest {
             new GenericContainer<>("redis:7-alpine").withExposedPorts(6379);
     @Container
     static final RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3.13-management-alpine");
+    private static final String TEST_QUEUE = "wh-7-test-queue";
+    @Autowired
+    private TestRestTemplate http;
+    @Autowired
+    private ChargeRepository chargeRepository;
+    @Autowired
+    private JdbcTemplate jdbc;
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+    @Autowired
+    private AmqpAdmin amqpAdmin;
+    @Autowired
+    private FanoutExchange chargeEventsExchange;
+    @Autowired
+    private WebhookService webhookService;
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+    @SpyBean
+    private RabbitTemplate rabbitTemplate;
 
     // Containers get random ports, so tell Spring where they ended up
     @DynamicPropertySource
-    static void connectAppToContainers(DynamicPropertyRegistry registry){
+    static void connectAppToContainers(DynamicPropertyRegistry registry) {
         registry.add("spring.datasource.url", postgres::getJdbcUrl);
         registry.add("spring.datasource.username", postgres::getUsername);
         registry.add("spring.datasource.password", postgres::getPassword);
@@ -70,21 +88,10 @@ public class WebhookIdempotencyIntegrationTest {
         registry.add("spring.rabbitmq.host", rabbit::getHost);
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
     }
-    @Autowired private TestRestTemplate http;
-    @Autowired private ChargeRepository chargeRepository;
-    @Autowired
-    private JdbcTemplate jdbc;
-    @Autowired private StringRedisTemplate redisTemplate;
-    @Autowired private AmqpAdmin amqpAdmin;
-    @Autowired private FanoutExchange chargeEventsExchange;
-    @Autowired private WebhookService webhookService;
-    @Autowired private TransactionTemplate transactionTemplate;
-    @SpyBean
-    private RabbitTemplate rabbitTemplate;
 
     @BeforeEach
-    void bindEmptyTestQueue(){
-        Queue queue = new Queue(TEST_QUEUE, false,false,true);
+    void bindEmptyTestQueue() {
+        Queue queue = new Queue(TEST_QUEUE, false, false, true);
         amqpAdmin.declareQueue(queue);
         amqpAdmin.declareBinding(BindingBuilder.bind(queue).to(chargeEventsExchange));
         amqpAdmin.purgeQueue(TEST_QUEUE);
@@ -167,7 +174,7 @@ public class WebhookIdempotencyIntegrationTest {
         String eventId = newEventId();
 
         sendWebhook(eventId, charge.getId(), "SUCCEEDED");
-        LocalDateTime changedAt = reload(charge).getLastModifiedDate();
+        Instant changedAt = reload(charge).getLastModifiedDate();
         assertThat(changedAt).isNotNull();
 
         ResponseEntity<String> second = sendWebhook(eventId, charge.getId(), "SUCCEEDED");
@@ -184,7 +191,7 @@ public class WebhookIdempotencyIntegrationTest {
         String eventId = newEventId();
 
         sendWebhook(eventId, charge.getId(), "SUCCEEDED");
-        LocalDateTime changedAt = reload(charge).getLastModifiedDate();
+        Instant changedAt = reload(charge).getLastModifiedDate();
 
         // Simulate the note expiring or Redis restarting
         redisTemplate.delete("webhook:" + eventId);

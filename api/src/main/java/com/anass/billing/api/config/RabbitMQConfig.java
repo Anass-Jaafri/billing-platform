@@ -1,5 +1,6 @@
 package com.anass.billing.api.config;
 
+import com.anass.billing.common.messaging.Messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.FanoutExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
@@ -10,7 +11,7 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMQConfig {
-    public static final String CHARGE_EVENTS_EXCHANGE = "charge-events";
+    public static final String CHARGE_EVENTS_EXCHANGE = Messaging.CHARGE_EVENTS_EXCHANGE;
     // Declared here (producer side)
     // workers will re-declare this same exchange when it adds queues/bindings;
     @Bean
