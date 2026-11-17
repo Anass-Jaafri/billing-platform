@@ -13,25 +13,50 @@ public class RabbitMQTopologyConfig {
         return new FanoutExchange(Messaging.CHARGE_EVENTS_EXCHANGE);
     }
 
-    // Durable: the queue (and the messages in it) survive a RabbitMQ restart
+    // Where rejected (exhausted) messages go. Direct = exact routing-key match
+    @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange(Messaging.DEAD_LETTER_EXCHANGE);
+    }
+
+    // --- work queues: durable, each dead-letters to the DLX using its own name as key ---
+
     @Bean
     public Queue invoiceQueue() {
-        return QueueBuilder.durable(Messaging.INVOICE_QUEUE).build();
+        return workQueue(Messaging.INVOICE_QUEUE);
     }
 
     @Bean
     public Queue emailQueue() {
-        return QueueBuilder.durable(Messaging.EMAIL_QUEUE).build();
+        return workQueue(Messaging.EMAIL_QUEUE);
     }
 
     @Bean
     public Queue auditQueue() {
-        return QueueBuilder.durable(Messaging.AUDIT_QUEUE).build();
+        return workQueue(Messaging.AUDIT_QUEUE);
     }
 
-    // Durable: the queue (and the messages in it) survive a RabbitMQ restart
+    // --- one dead-letter queue per worker ---
+
     @Bean
-    public Binding invoicBinding() {
+    public Queue invoiceDlq() {
+        return QueueBuilder.durable(Messaging.INVOICE_DLQ).build();
+    }
+
+    @Bean
+    public Queue emailDlq() {
+        return QueueBuilder.durable(Messaging.EMAIL_DLQ).build();
+    }
+
+    @Bean
+    public Queue auditDlq() {
+        return QueueBuilder.durable(Messaging.AUDIT_DLQ).build();
+    }
+
+    // --- bindings: events fan out into the work queues ---
+
+    @Bean
+    public Binding invoiceBinding() {
         return BindingBuilder.bind(invoiceQueue()).to(chargeEventsExchange());
     }
 
@@ -43,5 +68,29 @@ public class RabbitMQTopologyConfig {
     @Bean
     public Binding auditBinding() {
         return BindingBuilder.bind(auditQueue()).to(chargeEventsExchange());
+    }
+
+    // --- bindings: dead letters route to the matching DLQ by the work queue's name ---
+
+    @Bean
+    public Binding invoiceDlqBinding() {
+        return BindingBuilder.bind(invoiceDlq()).to(deadLetterExchange()).with(Messaging.INVOICE_QUEUE);
+    }
+
+    @Bean
+    public Binding emailDlqBinding() {
+        return BindingBuilder.bind(emailDlq()).to(deadLetterExchange()).with(Messaging.EMAIL_QUEUE);
+    }
+
+    @Bean
+    public Binding auditDlqBinding() {
+        return BindingBuilder.bind(auditDlq()).to(deadLetterExchange()).with(Messaging.AUDIT_QUEUE);
+    }
+
+    private Queue workQueue(String name) {
+        return QueueBuilder.durable(name)
+                .deadLetterExchange(Messaging.DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(name)
+                .build();
     }
 }

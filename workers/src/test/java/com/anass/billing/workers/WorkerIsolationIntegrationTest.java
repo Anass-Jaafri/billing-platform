@@ -54,9 +54,6 @@ class WorkerIsolationIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.rabbitmq.host", rabbit::getHost);
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
-        // A failed message is dropped instead of being redelivered forever.
-        // Real retry + dead-letter handling arrives with the Resilience epic.
-        registry.add("spring.rabbitmq.listener.simple.default-requeue-rejected", () -> "false");
     }
 
     @BeforeEach

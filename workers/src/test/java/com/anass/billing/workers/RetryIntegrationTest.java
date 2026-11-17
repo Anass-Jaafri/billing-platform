@@ -46,8 +46,6 @@ class RetryIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.rabbitmq.host", rabbit::getHost);
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
-        // Until the dead-letter queue exists (RES-3), an exhausted message is dropped.
-        registry.add("spring.rabbitmq.listener.simple.default-requeue-rejected", () -> "false");
     }
 
     @Test
