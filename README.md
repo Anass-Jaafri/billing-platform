@@ -2,7 +2,7 @@
 
 An event-driven billing/payment orchestration service built to demonstrate
 production-grade backend patterns — idempotent webhook handling, retries with
-backoff, dead-letter queues, and observability — rather than another CRUD app.
+backoff, dead-letter queues, and observability.
 
 ## Modules
 

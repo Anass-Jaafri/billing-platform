@@ -12,16 +12,19 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
     public static final String CHARGE_EVENTS_EXCHANGE = Messaging.CHARGE_EVENTS_EXCHANGE;
+
     // Declared here (producer side)
     // workers will re-declare this same exchange when it adds queues/bindings;
     @Bean
-    public FanoutExchange chargeEventsExchange(){
+    public FanoutExchange chargeEventsExchange() {
         return new FanoutExchange(CHARGE_EVENTS_EXCHANGE);
     }
 
     @Bean
-    Jackson2JsonMessageConverter jsonMessageConverter(ObjectMapper objectMapper){
-        return new Jackson2JsonMessageConverter(objectMapper);
+    Jackson2JsonMessageConverter jsonMessageConverter(ObjectMapper objectMapper) {
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter(objectMapper);
+        converter.setCreateMessageIds(true);   // every published message gets a unique id (needed for DLQ replay)
+        return converter;
     }
 
     @Bean

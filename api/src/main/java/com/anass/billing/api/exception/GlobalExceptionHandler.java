@@ -1,5 +1,6 @@
 package com.anass.billing.api.exception;
 
+import com.anass.billing.common.messaging.DlqMessageNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,5 +79,17 @@ public class GlobalExceptionHandler {
         // Not an error from the provider's point of view: 200 means "got it,
         // stop retrying". Handled here once, instead of in every caller.
         return ResponseEntity.ok().build();
+    }
+
+    @ExceptionHandler({UnknownWorkerException.class, DlqMessageNotFoundException.class})
+    public ResponseEntity<ErrorResponse> handleDlqNotFound(RuntimeException ex, HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.NOT_FOUND.value(),
+                HttpStatus.NOT_FOUND.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 }
