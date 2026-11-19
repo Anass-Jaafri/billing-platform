@@ -54,9 +54,6 @@ class WorkerIsolationIntegrationTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.rabbitmq.host", rabbit::getHost);
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
-        // A failed message is dropped instead of being redelivered forever.
-        // Real retry + dead-letter handling arrives with the Resilience epic.
-        registry.add("spring.rabbitmq.listener.simple.default-requeue-rejected", () -> "false");
     }
 
     @BeforeEach
@@ -72,15 +69,15 @@ class WorkerIsolationIntegrationTest {
 
         publish(event);
 
-        // 1. the email worker really ran, and failed (once: the message was dropped, not looped)
-        verify(receiptSender, timeout(10_000)).send(argThat(r -> FAILING_CUSTOMER.equals(r.recipient())));
+        // 1. the email worker really ran, and kept failing until its attempts ran out
+        verify(receiptSender, timeout(10_000).times(3))
+                .send(argThat(r -> FAILING_CUSTOMER.equals(r.recipient())));
 
-        // 2. yet the other two workers fully processed the very same event
+        // 2. ...yet the other two workers fully processed the very same event
         await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
             assertThat(invoiceRepository.existsByChargeId(charge.getId())).isTrue();
             assertThat(auditLogRepository.existsByEventId(event.eventId())).isTrue();
         });
-        verify(receiptSender, times(1)).send(argThat(r -> FAILING_CUSTOMER.equals(r.recipient())));
     }
 
     @Test

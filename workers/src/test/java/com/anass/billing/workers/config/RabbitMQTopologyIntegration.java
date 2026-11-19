@@ -2,6 +2,8 @@ package com.anass.billing.workers.config;
 
 
 import com.anass.billing.common.messaging.Messaging;
+import com.rabbitmq.client.GetResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -45,6 +47,14 @@ public class RabbitMQTopologyIntegration {
         registry.add("spring.rabbitmq.port", rabbit::getAmqpPort);
     }
 
+    @BeforeEach
+    void purgeAllQueues() {
+        for (String queue : List.of(Messaging.INVOICE_QUEUE, Messaging.EMAIL_QUEUE, Messaging.AUDIT_QUEUE,
+                Messaging.INVOICE_DLQ, Messaging.EMAIL_DLQ, Messaging.AUDIT_DLQ)) {
+            amqpAdmin.purgeQueue(queue);
+        }
+    }
+
     @Test
     void oneEvent_isCopiedIntoEveryWorkerQueue() {
         rabbitTemplate.convertAndSend(Messaging.CHARGE_EVENTS_EXCHANGE, "", "one event");
@@ -54,6 +64,37 @@ public class RabbitMQTopologyIntegration {
                     .untilAsserted(() ->
                             assertThat(amqpAdmin.getQueueInfo(queue).getMessageCount()).isEqualTo(1));
         }
+    }
+
+    @Test
+    void deadLetterExchange_routesEachMessageToItsOwnWorkersDlq() {
+        rabbitTemplate.convertAndSend(Messaging.DEAD_LETTER_EXCHANGE, Messaging.EMAIL_QUEUE, "dead email");
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(amqpAdmin.getQueueInfo(Messaging.EMAIL_DLQ).getMessageCount()).isEqualTo(1));
+        assertThat(amqpAdmin.getQueueInfo(Messaging.INVOICE_DLQ).getMessageCount()).isZero();
+        assertThat(amqpAdmin.getQueueInfo(Messaging.AUDIT_DLQ).getMessageCount()).isZero();
+    }
+
+    @Test
+    void rejectedWorkMessage_isDeadLetteredToTheSameWorkersDlq() {
+        rabbitTemplate.convertAndSend(Messaging.CHARGE_EVENTS_EXCHANGE, "", "poison");
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(amqpAdmin.getQueueInfo(Messaging.INVOICE_QUEUE).getMessageCount()).isEqualTo(1));
+
+        // exactly what a failing listener causes: take the message, reject it, do not requeue
+        rabbitTemplate.execute(channel -> {
+            GetResponse response = channel.basicGet(Messaging.INVOICE_QUEUE, false);
+            channel.basicNack(response.getEnvelope().getDeliveryTag(), false, false);
+            return null;
+        });
+
+        await().atMost(Duration.ofSeconds(5)).untilAsserted(() ->
+                assertThat(amqpAdmin.getQueueInfo(Messaging.INVOICE_DLQ).getMessageCount()).isEqualTo(1));
+        assertThat(amqpAdmin.getQueueInfo(Messaging.INVOICE_QUEUE).getMessageCount()).isZero();
+        // the other workers' copies are untouched
+        assertThat(amqpAdmin.getQueueInfo(Messaging.EMAIL_QUEUE).getMessageCount()).isEqualTo(1);
+        assertThat(amqpAdmin.getQueueInfo(Messaging.EMAIL_DLQ).getMessageCount()).isZero();
     }
 }
 
