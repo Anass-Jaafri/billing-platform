@@ -1,5 +1,6 @@
 package com.anass.billing.api.security;
 
+import com.anass.billing.api.exception.InvalidTokenException;
 import com.anass.billing.common.user.Role;
 import com.anass.billing.common.user.User;
 import io.jsonwebtoken.Claims;
@@ -10,7 +11,11 @@ import org.junit.jupiter.api.Test;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.Date;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,5 +66,64 @@ class JwtServiceTest {
         JwtProperties weak = new JwtProperties("too-short", Duration.ofMinutes(15), Duration.ofDays(7));
 
         assertThatThrownBy(() -> new JwtService(weak)).isInstanceOf(IllegalStateException.class);
+    }
+
+    private JwtService serviceAt(String instant) {
+        return new JwtService(properties, Clock.fixed(Instant.parse(instant), ZoneOffset.UTC));
+    }
+
+    @Test
+    void parseRefreshToken_returnsClaimsOfAValidRefreshToken() {
+        String token = jwtService.generateRefreshToken(admin);
+
+        assertThat(jwtService.parseRefreshToken(token).getSubject()).isEqualTo("admin");
+    }
+
+    @Test
+    void parseRefreshToken_rejectsAnAccessToken() {
+        String accessToken = jwtService.generateAccessToken(admin);
+
+        assertThatThrownBy(() -> jwtService.parseRefreshToken(accessToken))
+                .isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void parseRefreshToken_rejectsAnExpiredToken() {
+        String token = serviceAt("2026-01-01T00:00:00Z").generateRefreshToken(admin);
+
+        // eight days later: past the 7-day lifetime
+        assertThatThrownBy(() -> serviceAt("2026-01-09T00:00:00Z").parseRefreshToken(token))
+                .isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void parseRefreshToken_acceptsATokenJustInsideItsLifetime() {
+        String token = serviceAt("2026-01-01T00:00:00Z").generateRefreshToken(admin);
+
+        assertThat(serviceAt("2026-01-07T23:59:00Z").parseRefreshToken(token).getSubject()).isEqualTo("admin");
+    }
+
+    @Test
+    void parseRefreshToken_rejectsATokenSignedWithAnotherSecret() {
+        JwtProperties other = new JwtProperties("another-secret-another-secret-another-1", Duration.ofMinutes(15), Duration.ofDays(7));
+        String forged = new JwtService(other).generateRefreshToken(admin);
+
+        assertThatThrownBy(() -> jwtService.parseRefreshToken(forged)).isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void parseRefreshToken_rejectsAnUnsignedToken() {
+        String unsigned = Jwts.builder().subject("admin")
+                .claim(JwtService.CLAIM_ROLE, "ADMIN").claim(JwtService.CLAIM_TYPE, "refresh")
+                .expiration(Date.from(Instant.now().plus(Duration.ofDays(1))))
+                .compact();                                   // no signWith: "alg": "none"
+
+        assertThatThrownBy(() -> jwtService.parseRefreshToken(unsigned)).isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void parseRefreshToken_rejectsGarbageAndBlank() {
+        assertThatThrownBy(() -> jwtService.parseRefreshToken("not-a-jwt")).isInstanceOf(InvalidTokenException.class);
+        assertThatThrownBy(() -> jwtService.parseRefreshToken("")).isInstanceOf(InvalidTokenException.class);
     }
 }

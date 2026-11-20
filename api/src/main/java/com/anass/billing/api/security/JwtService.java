@@ -1,6 +1,9 @@
 package com.anass.billing.api.security;
 
+import com.anass.billing.api.exception.InvalidTokenException;
 import com.anass.billing.common.user.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +56,30 @@ public class JwtService {
 
     public Duration accessTokenTtl() {
         return properties.accessTtl();
+    }
+
+    /**
+     * Verifies signature and expiry, and that this really is a refresh token.
+     */
+    public Claims parseRefreshToken(String token) {
+        Claims claims = parse(token);
+        if (!TYPE_REFRESH.equals(claims.get(CLAIM_TYPE))) {
+            throw new InvalidTokenException();
+        }
+        return claims;
+    }
+
+    private Claims parse(String token) {
+        try {
+            return Jwts.parser()
+                    .verifyWith(key) // rejects wrong signature and unsigned ("alg: none") tokens
+                    .clock(() -> Date.from(clock.instant())) // expiry is judged by our clock, so tests control time
+                    .build()
+                    .parseSignedClaims(token)
+                    .getPayload();
+        } catch (JwtException | IllegalArgumentException e) { // malformed, expired, bad signature, blank
+            throw new InvalidTokenException();
+        }
     }
 
     private String build(User user, String type, Duration ttl) {

@@ -2,6 +2,7 @@ package com.anass.billing.api.auth;
 
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.InvalidCredentialsException;
+import com.anass.billing.api.exception.InvalidTokenException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -52,6 +53,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.message").value("Invalid username or password"));
     }
 
+
     @Test
     void login_withBlankFields_returns400() throws Exception {
         mockMvc.perform(post("/auth/login")
@@ -60,5 +62,35 @@ class AuthControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(authService);
+    }
+
+    @Test
+    void refresh_withAValidToken_returnsANewAccessToken() throws Exception {
+        when(authService.refresh("good")).thenReturn(new AccessTokenResponse("new-access", "Bearer", 900));
+
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"good\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.expiresIn").value(900));
+    }
+
+    @Test
+    void refresh_withAnInvalidToken_returns401() throws Exception {
+        when(authService.refresh("bad")).thenThrow(new InvalidTokenException());
+
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"bad\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void refresh_withABlankToken_returns400() throws Exception {
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
     }
 }

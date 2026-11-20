@@ -93,8 +93,8 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
-    @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex, HttpServletRequest request) {
+    @ExceptionHandler({InvalidCredentialsException.class, InvalidTokenException.class})
+    public ResponseEntity<ErrorResponse> handleUnauthorized(RuntimeException ex, HttpServletRequest request) {
         ErrorResponse body = new ErrorResponse(
                 Instant.now(),
                 HttpStatus.UNAUTHORIZED.value(),

@@ -1,9 +1,11 @@
 package com.anass.billing.api.auth;
 
 import com.anass.billing.api.exception.InvalidCredentialsException;
+import com.anass.billing.api.exception.InvalidTokenException;
 import com.anass.billing.api.security.JwtService;
 import com.anass.billing.common.user.User;
 import com.anass.billing.common.user.UserRepository;
+import io.jsonwebtoken.Claims;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -40,5 +42,16 @@ public class AuthService {
                 jwtService.generateRefreshToken(user),
                 "Bearer",
                 jwtService.accessTokenTtl().toSeconds());
+    }
+
+    public AccessTokenResponse refresh(String refreshToken) {
+        Claims claims = jwtService.parseRefreshToken(refreshToken);
+        User user = userRepository.findByUsername(claims.getSubject())
+                .orElseThrow(InvalidTokenException::new); // user deleted since the token was issued
+        return new AccessTokenResponse(
+                jwtService.generateAccessToken(user),
+                "Bearer",
+                jwtService.accessTokenTtl().toSeconds()
+        );
     }
 }
