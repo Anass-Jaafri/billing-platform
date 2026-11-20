@@ -37,3 +37,8 @@ management:
     health:
       show-details: always
 
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    access-ttl: 15m
+    refresh-ttl: 7d
