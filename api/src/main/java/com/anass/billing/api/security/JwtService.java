@@ -59,6 +59,17 @@ public class JwtService {
     }
 
     /**
+     * Verifies signature and expiry, and that this really is an access token.
+     */
+    public Claims parseAccessToken(String token) {
+        Claims claims = parse(token);
+        if (!TYPE_ACCESS.equals(claims.get(CLAIM_TYPE))) {
+            throw new InvalidTokenException();
+        }
+        return claims;
+    }
+
+    /**
      * Verifies signature and expiry, and that this really is a refresh token.
      */
     public Claims parseRefreshToken(String token) {
@@ -68,6 +79,7 @@ public class JwtService {
         }
         return claims;
     }
+
 
     private Claims parse(String token) {
         try {

@@ -3,6 +3,7 @@ package com.anass.billing.api.auth;
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.InvalidCredentialsException;
 import com.anass.billing.api.exception.InvalidTokenException;
+import com.anass.billing.api.security.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -26,6 +27,8 @@ class AuthControllerTest {
     MockMvc mockMvc;
     @MockBean
     AuthService authService;
+    @MockBean
+    JwtService jwtService;
 
     @Test
     void login_withValidCredentials_returnsTokens() throws Exception {

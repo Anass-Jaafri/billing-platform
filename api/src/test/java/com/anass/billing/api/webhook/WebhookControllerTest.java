@@ -1,18 +1,10 @@
 package com.anass.billing.api.webhook;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.ChargeNotFoundException;
 import com.anass.billing.api.exception.DuplicateWebhookException;
+import com.anass.billing.api.security.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -22,15 +14,27 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @WebMvcTest(WebhookController.class)
 @Import(SecurityConfig.class)
 class WebhookControllerTest {
 
     private static final UUID CHARGE_ID = UUID.fromString("eb3560cf-a886-464d-baac-0f26662f5669");
-
-    @Autowired private MockMvc mockMvc;
-    @Autowired private ObjectMapper objectMapper;
-    @MockBean private WebhookService webhookService;
+    @MockBean
+    JwtService jwtService;
+    @Autowired
+    private MockMvc mockMvc;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @MockBean
+    private WebhookService webhookService;
 
     private ResultActions postWebhook(String body) throws Exception {
         return mockMvc.perform(post("/webhooks/payment-provider")

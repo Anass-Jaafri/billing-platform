@@ -126,4 +126,19 @@ class JwtServiceTest {
         assertThatThrownBy(() -> jwtService.parseRefreshToken("not-a-jwt")).isInstanceOf(InvalidTokenException.class);
         assertThatThrownBy(() -> jwtService.parseRefreshToken("")).isInstanceOf(InvalidTokenException.class);
     }
+
+    @Test
+    void parseAccessToken_returnsClaimsOfAValidAccessToken() {
+        Claims claims = jwtService.parseAccessToken(jwtService.generateAccessToken(admin));
+
+        assertThat(claims.getSubject()).isEqualTo("admin");
+        assertThat(claims.get(JwtService.CLAIM_ROLE)).isEqualTo("ADMIN");
+    }
+
+    @Test
+    void parseAccessToken_rejectsARefreshToken() {
+        String refresh = jwtService.generateRefreshToken(admin);
+
+        assertThatThrownBy(() -> jwtService.parseAccessToken(refresh)).isInstanceOf(InvalidTokenException.class);
+    }
 }

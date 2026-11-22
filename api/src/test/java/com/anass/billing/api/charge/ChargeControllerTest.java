@@ -3,6 +3,7 @@ package com.anass.billing.api.charge;
 
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.ChargeNotFoundException;
+import com.anass.billing.api.security.JwtService;
 import com.anass.billing.common.charge.Charge;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -28,15 +30,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @WebMvcTest(ChargeController.class)
+@WithMockUser(roles = "MERCHANT")
 @Import(SecurityConfig.class)
 public class ChargeControllerTest {
 
+    @MockBean
+    JwtService jwtService;
     @Autowired
     private MockMvc mockMvc;
-
     @Autowired
     private ObjectMapper objectMapper; // Spring Boot autoconfigures this for JSON conversion
-
     @MockBean
     private ChargeService chargeService; // fake — the real one needs a repository we don't have here
 
