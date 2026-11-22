@@ -16,7 +16,7 @@
     <name>common</name>
     <description>
         Shared domain code used by both api and workers: JPA entities, event
-        DTOs matching the schema in TDD_and_ADRs.md Section 4, and shared
+        DTOs, and shared
         constants (queue/exchange names). No Spring Boot application here —
         this is a plain library module.
     </description>
@@ -26,6 +26,11 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -57,6 +62,7 @@
             <version>42.7.14</version>
             <scope>test</scope>
         </dependency>
+
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>postgresql</artifactId>

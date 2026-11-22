@@ -1,7 +1,7 @@
-package com.anass.billing.api;
+package com.anass.billing.api.dlq;
 
 import com.anass.billing.api.config.SecurityConfig;
-import com.anass.billing.api.dlq.DlqAdminController;
+import com.anass.billing.api.security.JwtService;
 import com.anass.billing.common.messaging.DlqMessage;
 import com.anass.billing.common.messaging.DlqMessageNotFoundException;
 import com.anass.billing.common.messaging.DlqOperations;
@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -22,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DlqAdminController.class)
+@WithMockUser(roles = "ADMIN")
 @Import(SecurityConfig.class)
 class DlqAdminControllerTest {
 
@@ -29,6 +31,8 @@ class DlqAdminControllerTest {
     MockMvc mockMvc;
     @MockBean
     DlqOperations dlqOperations;
+    @MockBean
+    JwtService jwtService;
 
     @Test
     void list_returnsMessagesWithParsedPayload() throws Exception {
@@ -65,5 +69,14 @@ class DlqAdminControllerTest {
 
         mockMvc.perform(post("/admin/dlq/email/replay/m-9"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(roles = "MERCHANT")
+    void asMerchant_listAndReplayAreForbidden() throws Exception {
+        mockMvc.perform(get("/admin/dlq/email")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/dlq/email/replay/m-1")).andExpect(status().isForbidden());
+
+        verifyNoInteractions(dlqOperations);   // rejected before the controller ever ran
     }
 }

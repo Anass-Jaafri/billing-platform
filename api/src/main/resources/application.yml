@@ -1,4 +1,6 @@
 spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
   application:
     name: billing-api
 
@@ -37,6 +39,8 @@ management:
     health:
       show-details: always
 
-# NOTE: values above target `docker compose up` (INFRA-2) for local dev.
-# No profiles/secrets management yet — that's appropriately out of scope
-# until the project needs an actual deployment target beyond local Docker.
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    access-ttl: 15m
+    refresh-ttl: 7d

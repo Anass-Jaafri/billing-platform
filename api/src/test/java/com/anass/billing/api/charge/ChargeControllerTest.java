@@ -3,6 +3,7 @@ package com.anass.billing.api.charge;
 
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.ChargeNotFoundException;
+import com.anass.billing.api.security.JwtService;
 import com.anass.billing.common.charge.Charge;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -28,15 +30,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @WebMvcTest(ChargeController.class)
+@WithMockUser(roles = "MERCHANT")
 @Import(SecurityConfig.class)
 public class ChargeControllerTest {
 
+    @MockBean
+    JwtService jwtService;
     @Autowired
     private MockMvc mockMvc;
-
     @Autowired
-    private ObjectMapper objectMapper; // Spring Boot auto-configures this for JSON conversion
-
+    private ObjectMapper objectMapper; // Spring Boot autoconfigures this for JSON conversion
     @MockBean
     private ChargeService chargeService; // fake — the real one needs a repository we don't have here
 
@@ -56,6 +59,7 @@ public class ChargeControllerTest {
                 .andExpect(jsonPath("$.customerRef").value("cust_123"))
                 .andExpect(jsonPath("$.status").value("PENDING"));
     }
+
     @Test
     void createCharge_withNegativeAmount_returns400WithFieldError() throws Exception {
         // amount: -5 violates @Positive — chargeService is never even called
@@ -67,6 +71,7 @@ public class ChargeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("amount"));
     }
+
     @Test
     void createCharge_withInvalidCurrency_returns400() throws Exception {
         CreateChargeRequest request = new CreateChargeRequest("cust_123", 5000, "usd"); // lowercase, violates @Pattern
@@ -103,6 +108,7 @@ public class ChargeControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Could not find charge with id: " + chargeId));
     }
+
     @Test
     void listCharges_returnsPagedResponse() throws Exception {
         Charge charge = Charge.builder()

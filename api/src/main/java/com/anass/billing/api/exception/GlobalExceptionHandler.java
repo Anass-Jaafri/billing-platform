@@ -1,9 +1,11 @@
 package com.anass.billing.api.exception;
 
 import com.anass.billing.common.messaging.DlqMessageNotFoundException;
+import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -91,5 +93,49 @@ public class GlobalExceptionHandler {
                 request.getRequestURI(),
                 null);
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler({InvalidCredentialsException.class, InvalidTokenException.class})
+    public ResponseEntity<ErrorResponse> handleUnauthorized(RuntimeException ex, HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                HttpStatus.UNAUTHORIZED.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+    }
+
+    @ExceptionHandler(UsernameAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleUsernameTaken(UsernameAlreadyExistsException ex, HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                HttpStatus.CONFLICT.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                null);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex, HttpServletRequest request) {
+        String message = "Request body is missing or malformed";
+        // e.g. a value that isn't one of the enum's constants: name the field, don't leak Jackson internals
+        if (ex.getCause() instanceof InvalidFormatException invalid
+                && !invalid.getPath().isEmpty()
+                && invalid.getPath().get(invalid.getPath().size() - 1).getFieldName() != null) {
+            message = "Invalid value for field '"
+                    + invalid.getPath().get(invalid.getPath().size() - 1).getFieldName() + "'";
+        }
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                HttpStatus.BAD_REQUEST.getReasonPhrase(),
+                message,
+                request.getRequestURI(),
+                null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 }
