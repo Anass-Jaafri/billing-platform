@@ -70,4 +70,13 @@ class DlqAdminControllerTest {
         mockMvc.perform(post("/admin/dlq/email/replay/m-9"))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @WithMockUser(roles = "MERCHANT")
+    void asMerchant_listAndReplayAreForbidden() throws Exception {
+        mockMvc.perform(get("/admin/dlq/email")).andExpect(status().isForbidden());
+        mockMvc.perform(post("/admin/dlq/email/replay/m-1")).andExpect(status().isForbidden());
+
+        verifyNoInteractions(dlqOperations);   // rejected before the controller ever ran
+    }
 }

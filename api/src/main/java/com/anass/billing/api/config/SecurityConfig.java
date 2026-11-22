@@ -1,5 +1,6 @@
 package com.anass.billing.api.config;
 
+import com.anass.billing.api.security.JsonAccessDeniedHandler;
 import com.anass.billing.api.security.JsonAuthenticationEntryPoint;
 import com.anass.billing.api.security.JwtAuthenticationFilter;
 import com.anass.billing.api.security.JwtService;
@@ -25,13 +26,15 @@ public class SecurityConfig {
                 // not automatically attached cookies or HTTP sessions.
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(e -> e.authenticationEntryPoint(new JsonAuthenticationEntryPoint(objectMapper)))
+                .exceptionHandling(e -> e
+                        .authenticationEntryPoint(new JsonAuthenticationEntryPoint(objectMapper))
+                        .accessDeniedHandler(new JsonAccessDeniedHandler(objectMapper)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/webhooks/payment-provider").permitAll()
                         .requestMatchers("/actuator/health/**").permitAll()
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
-
                 .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

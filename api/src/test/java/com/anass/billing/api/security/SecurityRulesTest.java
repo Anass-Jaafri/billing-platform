@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SecurityRulesTest {
 
     private final User admin = User.builder().username("admin").passwordHash("x").role(Role.ADMIN).build();
+    private final User merchant = User.builder().username("merchant").passwordHash("x").role(Role.MERCHANT).build();
     @Autowired
     MockMvc mockMvc;
     @Autowired
@@ -69,6 +70,31 @@ class SecurityRulesTest {
         mockMvc.perform(get("/webhooks")).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void adminEndpoint_withoutToken_returns401() throws Exception {
+        mockMvc.perform(get("/admin/probe")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void adminEndpoint_asMerchant_returns403Json() throws Exception {
+        mockMvc.perform(get("/admin/probe").header("Authorization", "Bearer " + jwtService.generateAccessToken(merchant)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message").value("You do not have permission to perform this action"));
+    }
+
+    @Test
+    void adminEndpoint_asAdmin_returns200() throws Exception {
+        mockMvc.perform(get("/admin/probe").header("Authorization", "Bearer " + jwtService.generateAccessToken(admin)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void merchantCanStillUseNormalProtectedEndpoints() throws Exception {
+        mockMvc.perform(get("/probe").header("Authorization", "Bearer " + jwtService.generateAccessToken(merchant)))
+                .andExpect(status().isOk());
+    }
+
     @RestController
     static class Probe {
         @GetMapping("/probe")
@@ -88,6 +114,11 @@ class SecurityRulesTest {
 
         @GetMapping("/webhooks")
         String webhookList() {
+            return "ok";
+        }
+
+        @GetMapping("/admin/probe")
+        String adminEndpoint() {
             return "ok";
         }
     }
