@@ -82,4 +82,10 @@ public class UserRepositoryIntegrationTest {
                 "INSERT INTO users (id, username, password_hash, role) VALUES (gen_random_uuid(), 'bob', 'x', 'ROOT')"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    void existsByUsername_isTrueForSeededUsers_andFalseOtherwise() {
+        assertThat(userRepository.existsByUsername("admin")).isTrue();
+        assertThat(userRepository.existsByUsername("nobody")).isFalse();
+    }
 }
