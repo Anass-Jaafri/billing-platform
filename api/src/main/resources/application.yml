@@ -37,7 +37,16 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: always
+      show-components: always        # per-dependency UP/DOWN, no internals
+      show-details: when-authorized  # versions and queries: only for the roles below
+      roles: ADMIN
+      probes:
+        enabled: true                # /actuator/health/liveness and /readiness
+      group:
+        liveness:
+          include: livenessState     # never depends on Postgres/Rabbit/Redis
+        readiness:
+          include: readinessState,db,rabbit,redis
 
 app:
   jwt:
