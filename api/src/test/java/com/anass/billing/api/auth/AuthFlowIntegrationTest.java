@@ -258,4 +258,37 @@ class AuthFlowIntegrationTest {
                 .signWith(key, Jwts.SIG.HS256)
                 .compact();
     }
+
+    @Test
+    void apiDocs_arePublic_andListEveryEndpoint() throws Exception {
+        String json = mockMvc.perform(MockMvcRequestBuilders.get("/v3/api-docs"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        JsonNode paths = objectMapper.readTree(json).get("paths");
+
+        assertThat(paths.fieldNames()).toIterable().contains(
+                "/auth/login", "/auth/refresh",
+                "/charges", "/charges/{charge-id}",
+                "/webhooks/payment-provider",
+                "/admin/users",
+                "/admin/dlq/{worker}", "/admin/dlq/{worker}/replay/{messageId}");
+    }
+
+    @Test
+    void apiDocs_declareTheBearerScheme_andPublicOperationsOptOut() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/v3/api-docs"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
+                .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.bearerFormat").value("JWT"))
+                // login needs no token, so its operation carries an empty security list
+                .andExpect(jsonPath("$.paths['/auth/login'].post.security").isEmpty())
+                .andExpect(jsonPath("$.paths['/webhooks/payment-provider'].post.security").isEmpty());
+    }
+
+    @Test
+    void swaggerUi_isPublic() throws Exception {
+        int status = mockMvc.perform(MockMvcRequestBuilders.get("/swagger-ui/index.html"))
+                .andReturn().getResponse().getStatus();
+
+        assertThat(status).isNotIn(401, 403);
+    }
 }
