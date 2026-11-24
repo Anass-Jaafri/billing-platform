@@ -1,13 +1,17 @@
 package com.anass.billing.common.logging;
 
+import ch.qos.logback.classic.LoggerContext;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.jboss.logging.MDC;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.logging.LoggingSystem;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
@@ -19,6 +23,18 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StructuredLoggingTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @BeforeEach
+    void freshLogging() {
+        resetLogging();
+    }
+
+    @AfterEach
+    void resetLogging() {
+        // Forget "already initialized" so the next SpringApplication configures logging from scratch
+        LoggingSystem.get(getClass().getClassLoader()).cleanUp();
+        ((LoggerContext) LoggerFactory.getILoggerFactory()).reset();
+    }
 
     private void logWith(String profile, Runnable logging) {
         SpringApplicationBuilder builder = new SpringApplicationBuilder(Empty.class)
