@@ -47,7 +47,9 @@ management:
           include: livenessState     # never depends on Postgres/Rabbit/Redis
         readiness:
           include: readinessState,db,rabbit,redis
-
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
 app:
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}

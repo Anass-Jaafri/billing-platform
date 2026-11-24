@@ -1,5 +1,6 @@
 package com.anass.billing.api.config;
 
+import com.anass.billing.common.correlation.CorrelationIdMessagePostProcessor;
 import com.anass.billing.common.messaging.Messaging;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.amqp.core.FanoutExchange;
@@ -31,6 +32,8 @@ public class RabbitMQConfig {
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, Jackson2JsonMessageConverter converter) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(converter);
+        // copies the request's correlation ID (MDC) into every published message (OBS-4)
+        template.setBeforePublishPostProcessors(new CorrelationIdMessagePostProcessor());
         // synchronizes this channel's commit with the surrounding
         // @Transactional method — if the DB transaction rolls back,
         // this publish never actually reaches the broker.
