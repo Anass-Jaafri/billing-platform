@@ -82,6 +82,7 @@ public class ChargeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"));
     }
+    
 
     @Test
     void findChargeById_whenFound_returns200() throws Exception {
