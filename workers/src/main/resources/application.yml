@@ -38,3 +38,6 @@ resilience4j:
         wait-duration: 1s                  # pause before the 2nd attempt
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2  # 1s before the 2nd attempt, 2s before the 3rd
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "

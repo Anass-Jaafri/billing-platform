@@ -3,6 +3,7 @@ package com.anass.billing.api.charge;
 
 import com.anass.billing.common.PagedResponse;
 import com.anass.billing.common.charge.Charge;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Tag(name = "Charges")
 @RestController
 @RequestMapping("/charges")
 public class ChargeController {
@@ -25,16 +27,17 @@ public class ChargeController {
     }
 
     @PostMapping
-    public ResponseEntity<ChargeResponse> createCharge(@Valid @RequestBody CreateChargeRequest request){
+    public ResponseEntity<ChargeResponse> createCharge(@Valid @RequestBody CreateChargeRequest request) {
         Charge charge = chargeService.createCharge(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ChargeResponse.from(charge));
     }
 
     @GetMapping
-    public ResponseEntity<PagedResponse<ChargeResponse>> listCharges(@PageableDefault(size = 20, sort = "createdDate", direction = Sort.Direction.DESC) Pageable pageable){
+    public ResponseEntity<PagedResponse<ChargeResponse>> listCharges(@PageableDefault(size = 20, sort = "createdDate", direction = Sort.Direction.DESC) Pageable pageable) {
         Page<Charge> charges = chargeService.listCharges(pageable);
-        return ResponseEntity.ok(PagedResponse.from(charges,ChargeResponse::from));
+        return ResponseEntity.ok(PagedResponse.from(charges, ChargeResponse::from));
     }
+
     @GetMapping("/{charge-id}")
     public ResponseEntity<ChargeResponse> findChargeById(@PathVariable("charge-id") UUID chargeId) {
         Charge charge = chargeService.findById(chargeId);
