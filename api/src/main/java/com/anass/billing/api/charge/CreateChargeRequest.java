@@ -9,6 +9,7 @@ public record CreateChargeRequest(
         @NotBlank String customerRef,
         @Valid
         @Positive long amount,
-        @NotBlank @Pattern(regexp = "^[A-Z]{3}$", message = "currency must be a 3-letter ISO code")
+        @NotBlank @Pattern(regexp = "USD", message = "only USD is supported")
         String currency
-) {}
+) {
+}

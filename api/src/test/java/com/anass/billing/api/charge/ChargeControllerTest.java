@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,7 +83,21 @@ public class ChargeControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"));
     }
-    
+
+    @Test
+    void createCharge_withUnsupportedCurrency_returns400AndNothingIsSaved() throws Exception {
+        // well-formed ISO code, but not the one currency v1 supports
+        CreateChargeRequest request = new CreateChargeRequest("cust_123", 5000, "EUR");
+
+        mockMvc.perform(post("/charges")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("currency"));
+
+        verifyNoInteractions(chargeService);
+    }
+
 
     @Test
     void findChargeById_whenFound_returns200() throws Exception {
