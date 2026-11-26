@@ -1,11 +1,13 @@
 package com.anass.billing.api.webhook;
 
 import com.anass.billing.api.config.RabbitMQConfig;
+import com.anass.billing.api.exception.ChargeAlreadySettledException;
 import com.anass.billing.api.exception.ChargeNotFoundException;
 import com.anass.billing.api.exception.DuplicateWebhookException;
 import com.anass.billing.common.charge.Charge;
 import com.anass.billing.common.charge.ChargeRepository;
 import com.anass.billing.common.event.ChargeEvent;
+import com.anass.billing.common.status.ChargeStatus;
 import com.anass.billing.common.webhook.WebhookEvent;
 import com.anass.billing.common.webhook.WebhookEventRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -65,15 +67,22 @@ public class WebhookService {
             return;
         }
 
-        // 2. The charge must exist. Say so clearly (404) instead of letting a
-        //    database error be mistaken for a duplicate.
-        Charge charge = chargeRepository.findById(request.chargeId())
+        // 2. The charge must exist. Lock its row until this transaction ends, so two
+        //    events for the same charge are handled one after the other, never together.
+        Charge charge = chargeRepository.findByIdForUpdate(request.chargeId())
                 .orElseThrow(() -> new ChargeNotFoundException(request.chargeId()));
 
         // 3. File the receipt, inside this same bundle.
         WebhookEvent webhookEvent = saveWebhookEvent(request);
 
-        // 4. Update the charge and prepare the announcement.
+        // 4. A charge settles only once. Answer for an already-settled charge, don't change it.
+        ChargeStatus reported = "SUCCEEDED".equals(request.outcome())
+                ? ChargeStatus.CONFIRMED : ChargeStatus.FAILED;
+        if (charge.getStatus() != ChargeStatus.PENDING) {
+            acknowledgeSettledCharge(charge, reported, request, webhookEvent, redisKey);
+            return;
+        }
+        // Update the charge and prepare the announcement.
         ChargeEvent chargeEvent;
         if ("SUCCEEDED".equals(request.outcome())) {
             charge.confirm();
@@ -92,6 +101,21 @@ public class WebhookService {
         rabbitTemplate.convertAndSend(RabbitMQConfig.CHARGE_EVENTS_EXCHANGE, "", chargeEvent);
 
         // 7. Sticky note: only written once the bundle has really committed.
+        writeStickyNoteAfterCommit(redisKey, request.chargeId().toString());
+    }
+
+    private void acknowledgeSettledCharge(Charge charge, ChargeStatus reported,
+                                          WebhookPayloadRequest request,
+                                          WebhookEvent webhookEvent, String redisKey) {
+        if (charge.getStatus() != reported) {
+            log.warn("Rejected webhook {}: charge {} is already {} but the provider reported {}",
+                    request.eventId(), charge.getId(), charge.getStatus(), request.outcome());
+            throw new ChargeAlreadySettledException(charge.getId(), charge.getStatus(), request.outcome());
+        }
+        log.info("Webhook {} repeats the outcome of charge {} (already {}); nothing to publish",
+                request.eventId(), charge.getId(), charge.getStatus());
+        webhookEvent.setProcessedAt(Instant.now());
+        webhookEventRepository.save(webhookEvent);
         writeStickyNoteAfterCommit(redisKey, request.chargeId().toString());
     }
 

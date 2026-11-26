@@ -54,6 +54,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
+    @ExceptionHandler(ChargeAlreadySettledException.class)
+    public ResponseEntity<ErrorResponse> handleChargeAlreadySettled(
+            ChargeAlreadySettledException ex, HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                Instant.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                ex.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     // Catch-all safety net — anything unexpected becomes a safe 500,
     // never leaking the real exception message or stack trace to the client
     @ExceptionHandler(Exception.class)

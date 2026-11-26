@@ -31,10 +31,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
+import java.util.concurrent.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -288,5 +285,67 @@ public class WebhookIdempotencyIntegrationTest {
         assertThat(webhookRows(eventId)).isZero();
         assertThat(stickyNoteExists(eventId)).isFalse();
         assertNoMessageEverArrives(); // the ADR-005 promise: rollback discards the publishing
+    }
+
+    @Test
+    void secondEventWithTheSameOutcome_isAcknowledged_recorded_andPublishesNothing() {
+        Charge charge = newCharge();
+        sendWebhook(newEventId(), charge.getId(), "SUCCEEDED");
+        assertExactlyOneMessageArrives();                      // the first event's announcement
+
+        String second = newEventId();
+        ResponseEntity<String> response = sendWebhook(second, charge.getId(), "SUCCEEDED");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(200);
+        assertThat(webhookRows(second)).isEqualTo(1);          // kept as a record of what the provider sent
+        assertThat(reload(charge).getStatus()).isEqualTo(ChargeStatus.CONFIRMED);
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3))
+                .untilAsserted(() -> assertThat(messagesInTestQueue()).isEqualTo(1)); // still just the first
+    }
+
+    @Test
+    void secondEventWithADifferentOutcome_isRejectedWith409_andChangesNothing() {
+        Charge charge = newCharge();
+        sendWebhook(newEventId(), charge.getId(), "SUCCEEDED");
+        assertExactlyOneMessageArrives();
+
+        String conflicting = newEventId();
+        ResponseEntity<String> response = sendWebhook(conflicting, charge.getId(), "FAILED");
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody()).contains("CONFIRMED");
+        assertThat(reload(charge).getStatus()).isEqualTo(ChargeStatus.CONFIRMED);
+        assertThat(webhookRows(conflicting)).isZero();         // rolled back with the transaction
+        assertThat(stickyNoteExists(conflicting)).isFalse();
+        await().during(Duration.ofSeconds(1)).atMost(Duration.ofSeconds(3))
+                .untilAsserted(() -> assertThat(messagesInTestQueue()).isEqualTo(1));
+    }
+
+    @Test
+    void twoDifferentEventsAtOnce_exactlyOneWins_theOtherGets409() throws Exception {
+        Charge charge = newCharge();
+        CountDownLatch go = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<ResponseEntity<String>> confirm = pool.submit(() -> {
+                go.await();
+                return sendWebhook(newEventId(), charge.getId(), "SUCCEEDED");
+            });
+            Future<ResponseEntity<String>> fail = pool.submit(() -> {
+                go.await();
+                return sendWebhook(newEventId(), charge.getId(), "FAILED");
+            });
+            go.countDown();   // release both at the same instant
+
+            List<Integer> statuses = List.of(
+                    confirm.get(10, TimeUnit.SECONDS).getStatusCode().value(),
+                    fail.get(10, TimeUnit.SECONDS).getStatusCode().value());
+            assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+        } finally {
+            pool.shutdownNow();
+        }
+
+        assertExactlyOneMessageArrives();                      // the loser announced nothing
+        assertThat(reload(charge).getStatus()).isIn(ChargeStatus.CONFIRMED, ChargeStatus.FAILED);
     }
 }
