@@ -161,16 +161,3 @@ Docker must be running: the integration tests start real PostgreSQL, RabbitMQ an
 | `simulator` | Command-line stand-in for the payment provider |
 
 **Stack:** Java 17, Spring Boot 3.3, Spring Security with JWT, Spring Data JPA and Hibernate, Flyway, PostgreSQL 16, RabbitMQ 3.13, Redis 7, Resilience4j, Micrometer, springdoc-openapi, Testcontainers, JUnit 5, Maven, GitHub Actions.
-
-## Known limitations
-
-This is a demonstration project, not a production system. Things to know:
-
-- **Seeded credentials.** The two development users (`admin`, `merchant`) and their passwords are public in this repository. Remove or replace them before any real deployment.
-- **The login limit is per client address.** An attacker using many addresses is not stopped. Behind a reverse proxy the API must be told to trust the forwarded-address header (`server.forward-headers-strategy`), otherwise every client looks like the proxy and shares one limit.
-- **Access tokens outlive logout.** They are stateless and valid until they expire, up to 15 minutes.
-- **Two refreshes with the same token at the same instant** (for example two browser tabs) look like theft and end the session; the user logs in again.
-- **The workers' Actuator is unauthenticated.** Keep port 8081 off any public network. Metrics on the API require an admin token, so a standard scraper such as Prometheus can't read them without extra setup.
-- **Single currency.** Only `USD` is accepted. There are no refunds or recurring billing.
-- **Receipts can repeat.** Email is mocked and goes to the customer reference rather than an address, and a redelivered message can log a second receipt.
-- **Dead-lettered messages don't record the error.** You can see the payload and how often it failed, but not the exception that caused it.
