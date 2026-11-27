@@ -55,6 +55,18 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_ignoresCaseAndSurroundingSpaces_inTheUsername() {
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
+        when(jwtService.generateAccessToken(admin)).thenReturn("access-token");
+        when(jwtService.generateRefreshToken(admin)).thenReturn("refresh-token");
+        when(jwtService.accessTokenTtl()).thenReturn(Duration.ofMinutes(15));
+
+        TokenResponse response = authService.login("  Admin ", "admin123");
+
+        assertThat(response.accessToken()).isEqualTo("access-token");
+    }
+
+    @Test
     void wrongPassword_isRejected_andIssuesNoToken() {
         when(userRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
 

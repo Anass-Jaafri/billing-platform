@@ -3,6 +3,7 @@ package com.anass.billing.api.auth;
 import com.anass.billing.api.exception.InvalidCredentialsException;
 import com.anass.billing.api.exception.InvalidTokenException;
 import com.anass.billing.api.security.JwtService;
+import com.anass.billing.api.user.Usernames;
 import com.anass.billing.common.user.User;
 import com.anass.billing.common.user.UserRepository;
 import io.jsonwebtoken.Claims;
@@ -28,7 +29,7 @@ public class AuthService {
     }
 
     public TokenResponse login(String username, String password) {
-        Optional<User> found = userRepository.findByUsername(username);
+        Optional<User> found = userRepository.findByUsername(Usernames.normalize(username));
         if (found.isEmpty()) {
             passwordEncoder.matches(password, dummyHash);
             throw new InvalidCredentialsException();

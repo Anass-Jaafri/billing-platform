@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -88,6 +89,13 @@ class AuthFlowIntegrationTest {
                 .isEqualTo(objectMapper.readTree(unknownUser).get("message").asText())
                 .isEqualTo("Invalid username or password");
     }
+
+    @Test
+    void login_isCaseInsensitive_forTheUsername() throws Exception {
+        login("ADMIN", "admin123");
+        login(" Merchant ", "merchant123");
+    }
+
 
     // ---------- refresh ----------
 
@@ -198,6 +206,20 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Username already exists: merchant"));
     }
 
+    @Test
+    void creatingAUserDifferingOnlyByCase_returns409_andAMixedCaseNameIsStoredLowerCase() throws Exception {
+        String adminToken = login("admin", "admin123").get("accessToken").asText();
+
+        createUser(adminToken, "Merchant", "MERCHANT")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Username already exists: merchant"));
+
+        String mixed = "It" + UUID.randomUUID().toString().replace("-", "");
+        createUser(adminToken, mixed, "MERCHANT")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value(mixed.toLowerCase(Locale.ROOT)));
+        login(mixed, "s3cretpass");
+    }
     // ---------- public endpoints ----------
 
     @Test

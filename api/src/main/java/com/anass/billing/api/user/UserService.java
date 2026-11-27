@@ -19,11 +19,12 @@ public class UserService {
     }
 
     public User createUser(CreateUserRequest request) {
-        if (userRepository.existsByUsername(request.username())) {
-            throw new UsernameAlreadyExistsException(request.username());
+        String username = Usernames.normalize(request.username());
+        if (userRepository.existsByUsername(username)) {
+            throw new UsernameAlreadyExistsException(username);
         }
         User user = User.builder()
-                .username(request.username())
+                .username(username)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .role(request.role())
                 .build();
@@ -31,7 +32,7 @@ public class UserService {
             return userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             // lost a race with another request: the unique constraint is the final authority
-            throw new UsernameAlreadyExistsException(request.username());
+            throw new UsernameAlreadyExistsException(username);
         }
     }
 }

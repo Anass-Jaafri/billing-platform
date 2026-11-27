@@ -88,4 +88,11 @@ public class UserRepositoryIntegrationTest {
         assertThat(userRepository.existsByUsername("admin")).isTrue();
         assertThat(userRepository.existsByUsername("nobody")).isFalse();
     }
+
+    @Test
+    void mixedCaseUsername_isRejectedByTheDatabase() {
+        assertThatThrownBy(() -> userRepository.saveAndFlush(User.builder()
+                .username("Alice").passwordHash("x").role(Role.MERCHANT).build()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
 }

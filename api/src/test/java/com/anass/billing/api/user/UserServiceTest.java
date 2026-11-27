@@ -61,4 +61,15 @@ class UserServiceTest {
         assertThatThrownBy(() -> service.createUser(new CreateUserRequest("alice", "s3cretpass", Role.MERCHANT)))
                 .isInstanceOf(UsernameAlreadyExistsException.class);
     }
+
+    @Test
+    void createUser_storesAndChecksTheLowerCasedUsername() {
+        when(userRepository.existsByUsername("alice")).thenReturn(false);
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        User created = service.createUser(new CreateUserRequest("Alice", "s3cretpass", Role.MERCHANT));
+
+        assertThat(created.getUsername()).isEqualTo("alice");
+        verify(userRepository).existsByUsername("alice");
+    }
 }
