@@ -224,6 +224,62 @@ class AuthFlowIntegrationTest {
         get("/charges", "not-a-jwt").andExpect(status().isUnauthorized());
     }
 
+    // ---------- logout ----------
+
+    @Test
+    void logout_killsTheRefreshToken() throws Exception {
+        String refreshToken = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+
+        refreshRequest(refreshToken).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logout_killsTheTokensFromEarlierRotationsToo() throws Exception {
+        String first = login("admin", "admin123").get("refreshToken").asText();
+        String body = refreshRequest(first).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String second = objectMapper.readTree(body).get("refreshToken").asText();
+
+        logoutRequest(second).andExpect(status().isNoContent());
+
+        refreshRequest(second).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loggingOutTwice_isHarmless() throws Exception {
+        String refreshToken = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_onlyEndsThatSession() throws Exception {
+        String laptop = login("admin", "admin123").get("refreshToken").asText();
+        String phone = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(laptop).andExpect(status().isNoContent());
+
+        refreshRequest(phone).andExpect(status().isOk());
+    }
+
+    @Test
+    void logout_withGarbage_looksTheSameAsALogout() throws Exception {
+        logoutRequest("not-a-token").andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_doesNotCancelAnAccessTokenThatIsStillValid() throws Exception {
+        JsonNode tokens = login("admin", "admin123");
+
+        logoutRequest(tokens.get("refreshToken").asText()).andExpect(status().isNoContent());
+
+        // Known limit: access tokens are stateless and expire on their own within 15 minutes
+        get("/charges", tokens.get("accessToken").asText()).andExpect(status().isOk());
+    }
+
     // ---------- roles ----------
 
     @Test
@@ -354,6 +410,12 @@ class AuthFlowIntegrationTest {
 
     private ResultActions refreshRequest(String refreshToken) throws Exception {
         return mockMvc.perform(post("/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken))));
+    }
+
+    private ResultActions logoutRequest(String refreshToken) throws Exception {
+        return mockMvc.perform(post("/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken))));
     }

@@ -123,4 +123,20 @@ public class AuthService {
                 "Bearer",
                 jwtService.accessTokenTtl().toSeconds());
     }
+
+    /**
+     * Ends the session this refresh token belongs to. Never fails for a bad token: logging out twice,
+     * or with a token that has expired, is not an error and tells the caller nothing.
+     */
+    @Transactional
+    public void logout(String refreshToken) {
+        UUID jti;
+        try {
+            jti = tokenId(jwtService.parseRefreshToken(refreshToken));
+        } catch (InvalidTokenException e) {
+            return;   // expired, forged, wrong type: nothing of ours to revoke
+        }
+        refreshTokenRepository.findByJtiForUpdate(jti)
+                .ifPresent(stored -> refreshTokenRepository.revokeFamily(stored.getFamilyId(), Instant.now()));
+    }
 }

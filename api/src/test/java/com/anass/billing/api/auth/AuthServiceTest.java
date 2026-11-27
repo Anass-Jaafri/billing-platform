@@ -234,4 +234,44 @@ class AuthServiceTest {
         verifyNoInteractions(refreshTokenRepository);
         verify(jwtService, never()).issueRefreshToken(any());
     }
+    // ---------- logout ----------
+
+    @Test
+    void logout_revokesTheWholeSessionOfTheToken() {
+        presenting(OLD_JTI);
+        when(refreshTokenRepository.findByJtiForUpdate(OLD_JTI)).thenReturn(Optional.of(storedToken(OLD_JTI, false)));
+
+        authService.logout("presented");
+
+        verify(refreshTokenRepository).revokeFamily(eq(FAMILY), any(Instant.class));
+    }
+
+    @Test
+    void logout_withAnAlreadyUsedToken_stillEndsTheSession_withoutError() {
+        presenting(OLD_JTI);
+        when(refreshTokenRepository.findByJtiForUpdate(OLD_JTI)).thenReturn(Optional.of(storedToken(OLD_JTI, true)));
+
+        authService.logout("presented");
+
+        verify(refreshTokenRepository).revokeFamily(eq(FAMILY), any(Instant.class));
+    }
+
+    @Test
+    void logout_withAnInvalidToken_isSilent_andRevokesNothing() {
+        when(jwtService.parseRefreshToken("bad")).thenThrow(new InvalidTokenException());
+
+        authService.logout("bad");
+
+        verifyNoInteractions(refreshTokenRepository);
+    }
+
+    @Test
+    void logout_withATokenWeNeverIssued_isSilent() {
+        presenting(OLD_JTI);
+        when(refreshTokenRepository.findByJtiForUpdate(OLD_JTI)).thenReturn(Optional.empty());
+
+        authService.logout("presented");
+
+        verify(refreshTokenRepository, never()).revokeFamily(any(), any());
+    }
 }

@@ -14,8 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -107,5 +106,24 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logout_returns204_andPassesTheTokenOn() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"some-token\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("some-token");
+    }
+
+    @Test
+    void logout_withABlankToken_returns400() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(authService);
     }
 }
