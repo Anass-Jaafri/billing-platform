@@ -3,6 +3,7 @@ package com.anass.billing.api.security;
 import com.anass.billing.api.exception.InvalidTokenException;
 import com.anass.billing.common.user.User;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -16,6 +17,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.UUID;
 
 @Service
 @EnableConfigurationProperties(JwtProperties.class)
@@ -49,11 +51,15 @@ public class JwtService {
     }
 
     public String generateAccessToken(User user) {
-        return build(user, TYPE_ACCESS, properties.accessTtl());
+        Instant now = clock.instant();
+        return build(user, TYPE_ACCESS, now, now.plus(properties.accessTtl()), null);
     }
 
-    public String generateRefreshToken(User user) {
-        return build(user, TYPE_REFRESH, properties.refreshTtl());
+    public IssuedRefreshToken issueRefreshToken(User user) {
+        UUID id = UUID.randomUUID();
+        Instant now = clock.instant();
+        Instant expiresAt = now.plus(properties.refreshTtl());
+        return new IssuedRefreshToken(build(user, TYPE_REFRESH, now, expiresAt, id.toString()), id, expiresAt);
     }
 
     public Duration accessTokenTtl() {
@@ -82,7 +88,6 @@ public class JwtService {
         return claims;
     }
 
-
     private Claims parse(String token) {
         try {
             return Jwts.parser()
@@ -96,15 +101,22 @@ public class JwtService {
         }
     }
 
-    private String build(User user, String type, Duration ttl) {
-        Instant now = clock.instant();
-        return Jwts.builder()
+    private String build(User user, String type, Instant issuedAt, Instant expiresAt, String id) {
+        JwtBuilder builder = Jwts.builder()
                 .subject(user.getUsername())
                 .claim(CLAIM_ROLE, user.getRole().name())
                 .claim(CLAIM_TYPE, type)
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(ttl)))
-                .signWith(key, Jwts.SIG.HS256)
-                .compact();
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(expiresAt));
+        if (id != null) {
+            builder.id(id);   // the "jti" claim
+        }
+        return builder.signWith(key, Jwts.SIG.HS256).compact();
+    }
+
+    /**
+     * A freshly signed refresh token with the id and expiry the server must remember.
+     */
+    public record IssuedRefreshToken(String token, UUID id, Instant expiresAt) {
     }
 }

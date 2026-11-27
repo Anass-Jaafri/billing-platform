@@ -145,11 +145,54 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
+    void refresh_rotatesTheToken_andReplayingTheOldOneEndsTheSession() throws Exception {
+        String first = login("admin", "admin123").get("refreshToken").asText();
+
+        String body = refreshRequest(first).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String second = objectMapper.readTree(body).get("refreshToken").asText();
+        assertThat(second).isNotEqualTo(first);
+
+        refreshRequest(first).andExpect(status().isUnauthorized());    // used-up token replayed
+        refreshRequest(second).andExpect(status().isUnauthorized());   // so the whole session is gone
+    }
+
+    @Test
+    void refreshTokens_chainAcrossSeveralRotations() throws Exception {
+        String token = login("admin", "admin123").get("refreshToken").asText();
+
+        for (int i = 0; i < 3; i++) {
+            String body = refreshRequest(token).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            token = objectMapper.readTree(body).get("refreshToken").asText();
+        }
+    }
+
+    @Test
+    void endingOneSession_doesNotEndAnother() throws Exception {
+        String sessionA = login("admin", "admin123").get("refreshToken").asText();
+        String sessionB = login("admin", "admin123").get("refreshToken").asText();
+
+        refreshRequest(sessionA).andExpect(status().isOk());
+        refreshRequest(sessionA).andExpect(status().isUnauthorized());   // replay ends session A only
+
+        refreshRequest(sessionB).andExpect(status().isOk());
+    }
+
+    @Test
+    void aWellSignedRefreshToken_theServerNeverIssued_isRejected() throws Exception {
+        String forgedButSigned = signedToken(jwtSecret, "refresh", Instant.now(), Duration.ofDays(7));
+
+        refreshRequest(forgedButSigned).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedEndpoints_rejectARefreshTokenUsedAsBearer() throws Exception {
         String refreshToken = login("admin", "admin123").get("refreshToken").asText();
 
         get("/charges", refreshToken).andExpect(status().isUnauthorized());
     }
+
 
     // ---------- bad tokens ----------
 

@@ -79,14 +79,15 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_withAValidToken_returnsANewAccessToken() throws Exception {
-        when(authService.refresh("good")).thenReturn(new AccessTokenResponse("new-access", "Bearer", 900));
+    void refresh_withAValidToken_returnsANewPair() throws Exception {
+        when(authService.refresh("good")).thenReturn(new TokenResponse("new-access", "new-refresh", "Bearer", 900));
 
         mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"good\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh"))
                 .andExpect(jsonPath("$.expiresIn").value(900));
     }
 
