@@ -39,7 +39,9 @@ public class JwtService {
     JwtService(JwtProperties properties, Clock clock) {
         byte[] secret = properties.secret().getBytes(StandardCharsets.UTF_8);
         if (secret.length < MIN_SECRET_BYTES) {
-            throw new IllegalStateException("app.jwt.secret must be at least " + MIN_SECRET_BYTES + " bytes");
+            throw new IllegalStateException(
+                    "JWT_SECRET (app.jwt.secret) must be set to a random value of at least "
+                            + MIN_SECRET_BYTES + " bytes. Generate one, for example, with: openssl rand -base64 48");
         }
         this.properties = properties;
         this.clock = clock;

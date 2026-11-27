@@ -52,6 +52,6 @@ logging:
     correlation: "[%X{correlationId:-}] "
 app:
   jwt:
-    secret: ${JWT_SECRET:dev-only-secret-change-me-dev-only-secret-change-me}
+    secret: ${JWT_SECRET:}
     access-ttl: 15m
     refresh-ttl: 7d

@@ -33,6 +33,15 @@ class JwtServiceTest {
     }
 
     @Test
+    void aMissingSecret_stopsStartup_withAMessageThatNamesTheVariable() {
+        JwtProperties missing = new JwtProperties("", Duration.ofMinutes(15), Duration.ofDays(7));
+
+        assertThatThrownBy(() -> new JwtService(missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
     void accessToken_carriesSubjectRoleAndType_andExpiresInFifteenMinutes() {
         Claims claims = parse(jwtService.generateAccessToken(admin));
 
