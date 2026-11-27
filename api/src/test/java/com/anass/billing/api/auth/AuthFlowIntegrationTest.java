@@ -96,7 +96,33 @@ class AuthFlowIntegrationTest {
         login(" Merchant ", "merchant123");
     }
 
+    @Test
+    void fiveFailedLogins_lockThatAccountOutOfThatAddress_evenForTheCorrectPassword() throws Exception {
+        String adminToken = login("admin", "admin123").get("accessToken").asText();
+        String username = uniqueUsername();
+        createUser(adminToken, username, "MERCHANT").andExpect(status().isCreated());
 
+        for (int i = 0; i < 5; i++) {
+            loginRequest(username, "wrong-" + i).andExpect(status().isUnauthorized());
+        }
+
+        loginRequest(username, "s3cretpass")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(result -> assertThat(
+                        Long.parseLong(result.getResponse().getHeader("Retry-After"))).isBetween(1L, 900L));
+
+        login("merchant", "merchant123");   // another account from the same address is unaffected
+    }
+
+    @Test
+    void unknownUsernames_areLimitedExactlyLikeKnownOnes() throws Exception {
+        String ghost = uniqueUsername();   // never created
+
+        for (int i = 0; i < 5; i++) {
+            loginRequest(ghost, "x" + i).andExpect(status().isUnauthorized());
+        }
+        loginRequest(ghost, "x").andExpect(status().isTooManyRequests());
+    }
     // ---------- refresh ----------
 
     @Test

@@ -18,18 +18,37 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final LoginAttemptLimiter loginAttemptLimiter;
     // Checked when the user doesn't exist, so "unknown user" costs the same time as "wrong password"
     private final String dummyHash;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       JwtService jwtService, LoginAttemptLimiter loginAttemptLimiter) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.loginAttemptLimiter = loginAttemptLimiter;
         this.dummyHash = passwordEncoder.encode("not-a-real-password");
     }
 
-    public TokenResponse login(String username, String password) {
-        Optional<User> found = userRepository.findByUsername(Usernames.normalize(username));
+    /**
+     * The public entry point. Always goes through the failed-login limit.
+     */
+    public TokenResponse login(String username, String password, String clientAddress) {
+        String normalized = Usernames.normalize(username);
+        loginAttemptLimiter.checkAllowed(normalized, clientAddress);   // before any password work
+        try {
+            TokenResponse tokens = authenticate(normalized, password);
+            loginAttemptLimiter.reset(normalized, clientAddress);
+            return tokens;
+        } catch (InvalidCredentialsException e) {
+            loginAttemptLimiter.recordFailure(normalized, clientAddress);
+            throw e;
+        }
+    }
+
+    private TokenResponse authenticate(String normalizedUsername, String password) {
+        Optional<User> found = userRepository.findByUsername(normalizedUsername);
         if (found.isEmpty()) {
             passwordEncoder.matches(password, dummyHash);
             throw new InvalidCredentialsException();
