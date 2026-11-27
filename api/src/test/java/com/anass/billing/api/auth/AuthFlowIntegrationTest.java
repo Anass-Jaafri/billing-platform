@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -89,6 +90,39 @@ class AuthFlowIntegrationTest {
                 .isEqualTo("Invalid username or password");
     }
 
+    @Test
+    void login_isCaseInsensitive_forTheUsername() throws Exception {
+        login("ADMIN", "admin123");
+        login(" Merchant ", "merchant123");
+    }
+
+    @Test
+    void fiveFailedLogins_lockThatAccountOutOfThatAddress_evenForTheCorrectPassword() throws Exception {
+        String adminToken = login("admin", "admin123").get("accessToken").asText();
+        String username = uniqueUsername();
+        createUser(adminToken, username, "MERCHANT").andExpect(status().isCreated());
+
+        for (int i = 0; i < 5; i++) {
+            loginRequest(username, "wrong-" + i).andExpect(status().isUnauthorized());
+        }
+
+        loginRequest(username, "s3cretpass")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(result -> assertThat(
+                        Long.parseLong(result.getResponse().getHeader("Retry-After"))).isBetween(1L, 900L));
+
+        login("merchant", "merchant123");   // another account from the same address is unaffected
+    }
+
+    @Test
+    void unknownUsernames_areLimitedExactlyLikeKnownOnes() throws Exception {
+        String ghost = uniqueUsername();   // never created
+
+        for (int i = 0; i < 5; i++) {
+            loginRequest(ghost, "x" + i).andExpect(status().isUnauthorized());
+        }
+        loginRequest(ghost, "x").andExpect(status().isTooManyRequests());
+    }
     // ---------- refresh ----------
 
     @Test
@@ -111,11 +145,54 @@ class AuthFlowIntegrationTest {
     }
 
     @Test
+    void refresh_rotatesTheToken_andReplayingTheOldOneEndsTheSession() throws Exception {
+        String first = login("admin", "admin123").get("refreshToken").asText();
+
+        String body = refreshRequest(first).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String second = objectMapper.readTree(body).get("refreshToken").asText();
+        assertThat(second).isNotEqualTo(first);
+
+        refreshRequest(first).andExpect(status().isUnauthorized());    // used-up token replayed
+        refreshRequest(second).andExpect(status().isUnauthorized());   // so the whole session is gone
+    }
+
+    @Test
+    void refreshTokens_chainAcrossSeveralRotations() throws Exception {
+        String token = login("admin", "admin123").get("refreshToken").asText();
+
+        for (int i = 0; i < 3; i++) {
+            String body = refreshRequest(token).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            token = objectMapper.readTree(body).get("refreshToken").asText();
+        }
+    }
+
+    @Test
+    void endingOneSession_doesNotEndAnother() throws Exception {
+        String sessionA = login("admin", "admin123").get("refreshToken").asText();
+        String sessionB = login("admin", "admin123").get("refreshToken").asText();
+
+        refreshRequest(sessionA).andExpect(status().isOk());
+        refreshRequest(sessionA).andExpect(status().isUnauthorized());   // replay ends session A only
+
+        refreshRequest(sessionB).andExpect(status().isOk());
+    }
+
+    @Test
+    void aWellSignedRefreshToken_theServerNeverIssued_isRejected() throws Exception {
+        String forgedButSigned = signedToken(jwtSecret, "refresh", Instant.now(), Duration.ofDays(7));
+
+        refreshRequest(forgedButSigned).andExpect(status().isUnauthorized());
+    }
+
+    @Test
     void protectedEndpoints_rejectARefreshTokenUsedAsBearer() throws Exception {
         String refreshToken = login("admin", "admin123").get("refreshToken").asText();
 
         get("/charges", refreshToken).andExpect(status().isUnauthorized());
     }
+
 
     // ---------- bad tokens ----------
 
@@ -145,6 +222,62 @@ class AuthFlowIntegrationTest {
     void protectedEndpoint_withoutAToken_orWithGarbage_returns401() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.get("/charges")).andExpect(status().isUnauthorized());
         get("/charges", "not-a-jwt").andExpect(status().isUnauthorized());
+    }
+
+    // ---------- logout ----------
+
+    @Test
+    void logout_killsTheRefreshToken() throws Exception {
+        String refreshToken = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+
+        refreshRequest(refreshToken).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void logout_killsTheTokensFromEarlierRotationsToo() throws Exception {
+        String first = login("admin", "admin123").get("refreshToken").asText();
+        String body = refreshRequest(first).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String second = objectMapper.readTree(body).get("refreshToken").asText();
+
+        logoutRequest(second).andExpect(status().isNoContent());
+
+        refreshRequest(second).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loggingOutTwice_isHarmless() throws Exception {
+        String refreshToken = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+        logoutRequest(refreshToken).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_onlyEndsThatSession() throws Exception {
+        String laptop = login("admin", "admin123").get("refreshToken").asText();
+        String phone = login("admin", "admin123").get("refreshToken").asText();
+
+        logoutRequest(laptop).andExpect(status().isNoContent());
+
+        refreshRequest(phone).andExpect(status().isOk());
+    }
+
+    @Test
+    void logout_withGarbage_looksTheSameAsALogout() throws Exception {
+        logoutRequest("not-a-token").andExpect(status().isNoContent());
+    }
+
+    @Test
+    void logout_doesNotCancelAnAccessTokenThatIsStillValid() throws Exception {
+        JsonNode tokens = login("admin", "admin123");
+
+        logoutRequest(tokens.get("refreshToken").asText()).andExpect(status().isNoContent());
+
+        // Known limit: access tokens are stateless and expire on their own within 15 minutes
+        get("/charges", tokens.get("accessToken").asText()).andExpect(status().isOk());
     }
 
     // ---------- roles ----------
@@ -198,6 +331,20 @@ class AuthFlowIntegrationTest {
                 .andExpect(jsonPath("$.message").value("Username already exists: merchant"));
     }
 
+    @Test
+    void creatingAUserDifferingOnlyByCase_returns409_andAMixedCaseNameIsStoredLowerCase() throws Exception {
+        String adminToken = login("admin", "admin123").get("accessToken").asText();
+
+        createUser(adminToken, "Merchant", "MERCHANT")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Username already exists: merchant"));
+
+        String mixed = "It" + UUID.randomUUID().toString().replace("-", "");
+        createUser(adminToken, mixed, "MERCHANT")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.username").value(mixed.toLowerCase(Locale.ROOT)));
+        login(mixed, "s3cretpass");
+    }
     // ---------- public endpoints ----------
 
     @Test
@@ -263,6 +410,12 @@ class AuthFlowIntegrationTest {
 
     private ResultActions refreshRequest(String refreshToken) throws Exception {
         return mockMvc.perform(post("/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken))));
+    }
+
+    private ResultActions logoutRequest(String refreshToken) throws Exception {
+        return mockMvc.perform(post("/auth/logout")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of("refreshToken", refreshToken))));
     }

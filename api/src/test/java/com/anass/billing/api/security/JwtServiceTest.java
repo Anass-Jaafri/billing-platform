@@ -33,6 +33,15 @@ class JwtServiceTest {
     }
 
     @Test
+    void aMissingSecret_stopsStartup_withAMessageThatNamesTheVariable() {
+        JwtProperties missing = new JwtProperties("", Duration.ofMinutes(15), Duration.ofDays(7));
+
+        assertThatThrownBy(() -> new JwtService(missing))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
     void accessToken_carriesSubjectRoleAndType_andExpiresInFifteenMinutes() {
         Claims claims = parse(jwtService.generateAccessToken(admin));
 
@@ -45,7 +54,7 @@ class JwtServiceTest {
 
     @Test
     void refreshToken_isTypedAsRefresh_andLivesSevenDays() {
-        Claims claims = parse(jwtService.generateRefreshToken(admin));
+        Claims claims = parse(jwtService.issueRefreshToken(admin).token());
 
         assertThat(claims.get(JwtService.CLAIM_TYPE)).isEqualTo("refresh");
         assertThat(Duration.between(claims.getIssuedAt().toInstant(), claims.getExpiration().toInstant()))
@@ -74,7 +83,7 @@ class JwtServiceTest {
 
     @Test
     void parseRefreshToken_returnsClaimsOfAValidRefreshToken() {
-        String token = jwtService.generateRefreshToken(admin);
+        String token = jwtService.issueRefreshToken(admin).token();
 
         assertThat(jwtService.parseRefreshToken(token).getSubject()).isEqualTo("admin");
     }
@@ -89,7 +98,7 @@ class JwtServiceTest {
 
     @Test
     void parseRefreshToken_rejectsAnExpiredToken() {
-        String token = serviceAt("2026-01-01T00:00:00Z").generateRefreshToken(admin);
+        String token = serviceAt("2026-01-01T00:00:00Z").issueRefreshToken(admin).token();
 
         // eight days later: past the 7-day lifetime
         assertThatThrownBy(() -> serviceAt("2026-01-09T00:00:00Z").parseRefreshToken(token))
@@ -98,7 +107,7 @@ class JwtServiceTest {
 
     @Test
     void parseRefreshToken_acceptsATokenJustInsideItsLifetime() {
-        String token = serviceAt("2026-01-01T00:00:00Z").generateRefreshToken(admin);
+        String token = serviceAt("2026-01-01T00:00:00Z").issueRefreshToken(admin).token();
 
         assertThat(serviceAt("2026-01-07T23:59:00Z").parseRefreshToken(token).getSubject()).isEqualTo("admin");
     }
@@ -106,7 +115,7 @@ class JwtServiceTest {
     @Test
     void parseRefreshToken_rejectsATokenSignedWithAnotherSecret() {
         JwtProperties other = new JwtProperties("another-secret-another-secret-another-1", Duration.ofMinutes(15), Duration.ofDays(7));
-        String forged = new JwtService(other).generateRefreshToken(admin);
+        String forged = new JwtService(other).issueRefreshToken(admin).token();
 
         assertThatThrownBy(() -> jwtService.parseRefreshToken(forged)).isInstanceOf(InvalidTokenException.class);
     }
@@ -137,8 +146,30 @@ class JwtServiceTest {
 
     @Test
     void parseAccessToken_rejectsARefreshToken() {
-        String refresh = jwtService.generateRefreshToken(admin);
+        String refresh = jwtService.issueRefreshToken(admin).token();
 
         assertThatThrownBy(() -> jwtService.parseAccessToken(refresh)).isInstanceOf(InvalidTokenException.class);
+    }
+
+    @Test
+    void refreshToken_carriesItsOwnId_soTwoTokensAreNeverTheSame() {
+        JwtService.IssuedRefreshToken first = jwtService.issueRefreshToken(admin);
+        JwtService.IssuedRefreshToken second = jwtService.issueRefreshToken(admin);
+
+        assertThat(parse(first.token()).getId()).isEqualTo(first.id().toString());
+        assertThat(first.id()).isNotEqualTo(second.id());
+        assertThat(first.token()).isNotEqualTo(second.token());
+    }
+
+    @Test
+    void issuedRefreshToken_reportsWhenItExpires() {
+        JwtService.IssuedRefreshToken issued = serviceAt("2026-01-01T00:00:00Z").issueRefreshToken(admin);
+
+        assertThat(issued.expiresAt()).isEqualTo(Instant.parse("2026-01-08T00:00:00Z"));
+    }
+
+    @Test
+    void accessToken_hasNoId() {
+        assertThat(parse(jwtService.generateAccessToken(admin)).getId()).isNull();
     }
 }

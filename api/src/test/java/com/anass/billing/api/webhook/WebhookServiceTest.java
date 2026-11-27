@@ -1,14 +1,5 @@
 package com.anass.billing.api.webhook;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-
 import com.anass.billing.api.config.RabbitMQConfig;
 import com.anass.billing.api.exception.ChargeNotFoundException;
 import com.anass.billing.api.exception.DuplicateWebhookException;
@@ -19,10 +10,6 @@ import com.anass.billing.common.status.ChargeStatus;
 import com.anass.billing.common.webhook.WebhookEvent;
 import com.anass.billing.common.webhook.WebhookEventRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.sql.SQLException;
-import java.time.Duration;
-import java.util.Optional;
-import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +24,17 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 @ExtendWith(MockitoExtension.class)
 class WebhookServiceTest {
 
@@ -44,11 +42,16 @@ class WebhookServiceTest {
     private static final String EVENT_ID = "evt_1";
     private static final String REDIS_KEY = "webhook:evt_1";
 
-    @Mock private WebhookEventRepository webhookEventRepository;
-    @Mock private ChargeRepository chargeRepository;
-    @Mock private StringRedisTemplate redisTemplate;
-    @Mock private ValueOperations<String, String> valueOperations;
-    @Mock private RabbitTemplate rabbitTemplate;
+    @Mock
+    private WebhookEventRepository webhookEventRepository;
+    @Mock
+    private ChargeRepository chargeRepository;
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+    @Mock
+    private RabbitTemplate rabbitTemplate;
 
     private WebhookService webhookService;
 
@@ -79,7 +82,7 @@ class WebhookServiceTest {
     private Charge stubHappyPath() {
         Charge charge = pendingCharge();
         when(redisTemplate.hasKey(REDIS_KEY)).thenReturn(false);
-        when(chargeRepository.findById(CHARGE_ID)).thenReturn(Optional.of(charge));
+        when(chargeRepository.findByIdForUpdate(CHARGE_ID)).thenReturn(Optional.of(charge));
         when(webhookEventRepository.saveAndFlush(any(WebhookEvent.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         return charge;
@@ -97,7 +100,7 @@ class WebhookServiceTest {
     @Test
     void unknownCharge_throwsChargeNotFound_andSavesNothing() {
         when(redisTemplate.hasKey(REDIS_KEY)).thenReturn(false);
-        when(chargeRepository.findById(CHARGE_ID)).thenReturn(Optional.empty());
+        when(chargeRepository.findByIdForUpdate(CHARGE_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> webhookService.receiveWebhook(request("SUCCEEDED")))
                 .isInstanceOf(ChargeNotFoundException.class);
@@ -109,7 +112,7 @@ class WebhookServiceTest {
     void uniqueViolation_throwsDuplicateWebhookException_andChangesNothing() {
         Charge charge = pendingCharge();
         when(redisTemplate.hasKey(REDIS_KEY)).thenReturn(false);
-        when(chargeRepository.findById(CHARGE_ID)).thenReturn(Optional.of(charge));
+        when(chargeRepository.findByIdForUpdate(CHARGE_ID)).thenReturn(Optional.of(charge));
         when(webhookEventRepository.saveAndFlush(any(WebhookEvent.class)))
                 .thenThrow(new DataIntegrityViolationException(
                         "dup", new SQLException("duplicate key", "23505")));
@@ -125,7 +128,7 @@ class WebhookServiceTest {
     @Test
     void otherIntegrityError_isRethrown_notMistakenForADuplicate() {
         when(redisTemplate.hasKey(REDIS_KEY)).thenReturn(false);
-        when(chargeRepository.findById(CHARGE_ID)).thenReturn(Optional.of(pendingCharge()));
+        when(chargeRepository.findByIdForUpdate(CHARGE_ID)).thenReturn(Optional.of(pendingCharge()));
         when(webhookEventRepository.saveAndFlush(any(WebhookEvent.class)))
                 .thenThrow(new DataIntegrityViolationException(
                         "fk", new SQLException("foreign key violation", "23503")));

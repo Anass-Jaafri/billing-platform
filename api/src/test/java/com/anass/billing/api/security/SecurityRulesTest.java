@@ -49,7 +49,7 @@ class SecurityRulesTest {
 
     @Test
     void protectedEndpoint_withARefreshTokenAsBearer_returns401() throws Exception {
-        mockMvc.perform(get("/probe").header("Authorization", "Bearer " + jwtService.generateRefreshToken(admin)))
+        mockMvc.perform(get("/probe").header("Authorization", "Bearer " + jwtService.issueRefreshToken(admin).token()))
                 .andExpect(status().isUnauthorized());
     }
 

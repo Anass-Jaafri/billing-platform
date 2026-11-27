@@ -33,6 +33,8 @@ public class ReceiptServiceTest {
         verify(receiptSender).send(sent.capture());
         assertThat(sent.getValue().recipient()).isEqualTo("cust_123");
         assertThat(sent.getValue().subject()).isEqualTo("Payment receipt");
-        assertThat(sent.getValue().body()).contains("50.00 MAD").contains(chargeId.toString());
+        assertThat(sent.getValue().body())
+                .contains("50.00 MAD was confirmed")
+                .contains(chargeId.toString());
     }
 }

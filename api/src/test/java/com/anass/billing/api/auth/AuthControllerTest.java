@@ -3,6 +3,7 @@ package com.anass.billing.api.auth;
 import com.anass.billing.api.config.SecurityConfig;
 import com.anass.billing.api.exception.InvalidCredentialsException;
 import com.anass.billing.api.exception.InvalidTokenException;
+import com.anass.billing.api.exception.TooManyLoginAttemptsException;
 import com.anass.billing.api.security.JwtService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,11 +14,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
 @Import(SecurityConfig.class)
@@ -32,7 +31,7 @@ class AuthControllerTest {
 
     @Test
     void login_withValidCredentials_returnsTokens() throws Exception {
-        when(authService.login("admin", "admin123"))
+        when(authService.login("admin", "admin123", "127.0.0.1"))
                 .thenReturn(new TokenResponse("acc", "ref", "Bearer", 900));
 
         mockMvc.perform(post("/auth/login")
@@ -47,7 +46,7 @@ class AuthControllerTest {
 
     @Test
     void login_withBadCredentials_returns401() throws Exception {
-        when(authService.login(any(), any())).thenThrow(new InvalidCredentialsException());
+        when(authService.login(any(), any(), any())).thenThrow(new InvalidCredentialsException());
 
         mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,14 +67,26 @@ class AuthControllerTest {
     }
 
     @Test
-    void refresh_withAValidToken_returnsANewAccessToken() throws Exception {
-        when(authService.refresh("good")).thenReturn(new AccessTokenResponse("new-access", "Bearer", 900));
+    void login_whenBlocked_returns429WithRetryAfter() throws Exception {
+        when(authService.login(any(), any(), any())).thenThrow(new TooManyLoginAttemptsException(840));
+
+        mockMvc.perform(post("/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin\",\"password\":\"x\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "840"));
+    }
+
+    @Test
+    void refresh_withAValidToken_returnsANewPair() throws Exception {
+        when(authService.refresh("good")).thenReturn(new TokenResponse("new-access", "new-refresh", "Bearer", 900));
 
         mockMvc.perform(post("/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"good\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("new-access"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh"))
                 .andExpect(jsonPath("$.expiresIn").value(900));
     }
 
@@ -95,5 +106,24 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"\"}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void logout_returns204_andPassesTheTokenOn() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"some-token\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(authService).logout("some-token");
+    }
+
+    @Test
+    void logout_withABlankToken_returns400() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(authService);
     }
 }

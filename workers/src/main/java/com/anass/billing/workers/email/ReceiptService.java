@@ -21,7 +21,7 @@ public class ReceiptService {
         receiptSender.send(new Receipt(
                 data.customerRef(),
                 "Payment receipt",
-                "Your payment of " + amount + "was confirmed. Reference: " + data.chargeId()
+                "Your payment of " + amount + " was confirmed. Reference: " + data.chargeId()
         ));
     }
 }
